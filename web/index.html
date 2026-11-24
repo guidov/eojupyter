@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eojupyter</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/syntax.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="topbar-left">
+      <button id="btn-toggle-sidebar" class="icon-btn" type="button" title="Toggle Explorer (Ctrl+B)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M2 2.75A.75.75 0 0 1 2.75 2h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75V2.75Zm3.5.75v9h7v-9h-7Zm-2 0v9H4.5v-9H3.5Z"/></svg>
+      </button>
+      <span class="brand">eojupyter</span>
+      <button id="btn-parent-dir" class="icon-btn" type="button" title="Open parent directory">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M3.22 7.22a.75.75 0 0 0 0 1.06l3.5 3.5a.75.75 0 1 0 1.06-1.06L5.56 8.5h6.69a.75.75 0 0 0 0-1.5H5.56l2.22-2.22a.75.75 0 1 0-1.06-1.06l-3.5 3.5Z"/></svg>
+      </button>
+      <form id="root-form" class="root-form" autocomplete="off">
+        <input id="root-input" type="text" spellcheck="false" title="Workspace root directory (press Enter to switch)">
+      </form>
+    </div>
+    <div class="topbar-right">
+      <span id="meta-badge" class="meta-badge" hidden></span>
+      <span class="readonly-pill" title="View-only mode (execution disabled)">Read-Only</span>
+      <button id="btn-theme" class="tool-btn" type="button" title="Toggle Light/Dark theme (t)">☾ Dark</button>
+      <button id="btn-prev-cell" class="tool-btn" type="button" title="Previous cell ([ or p)">↑ Cell</button>
+      <button id="btn-next-cell" class="tool-btn" type="button" title="Next cell (] or n)">↓ Cell</button>
+      <button id="btn-refresh" class="icon-btn" type="button" title="Refresh (r or F5)">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <aside id="sidebar" aria-label="File Explorer">
+      <div class="sidebar-header">
+        <span class="sidebar-title">EXPLORER</span>
+        <div class="mode-switch" role="group" aria-label="File filter mode">
+          <button id="btn-mode-ipynb" class="mode-pill active" type="button" title="Show .ipynb notebooks &amp; folders">.ipynb</button>
+          <button id="btn-mode-all" class="mode-pill" type="button" title="Show all files">All</button>
+        </div>
+      </div>
+      <div class="filter-box">
+        <input id="filter-input" type="search" placeholder="Filter files… (/ or Ctrl+P)" spellcheck="false" autocomplete="off">
+      </div>
+      <div id="file-tree" class="file-tree" tabindex="0" role="tree" aria-label="Workspace files"></div>
+    </aside>
+
+    <div id="resizer" title="Drag to resize sidebar"></div>
+
+    <section id="viewer-pane">
+      <div id="doc-header" class="doc-header" hidden>
+        <span id="doc-path" class="doc-path"></span>
+        <span id="doc-stats" class="doc-stats"></span>
+      </div>
+      <div id="viewer-scroll" class="viewer-scroll" tabindex="0">
+        <div id="notebook-root" class="notebook-root">
+          <div class="welcome-box">
+            <h2>eojupyter</h2>
+            <p>Select a <code>.ipynb</code> file on the left with <strong>↑ / ↓</strong>, expand folders with <strong>→ / ←</strong>, and scroll with <strong>PgUp / PgDn</strong>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="statusbar">
+    <div class="status-left">
+      <span><kbd>↑</kbd><kbd>↓</kbd> Navigate files</span>
+      <span><kbd>←</kbd><kbd>→</kbd> Fold / Expand</span>
+      <span><kbd>PgUp</kbd><kbd>PgDn</kbd> Scroll notebook</span>
+      <span><kbd>[</kbd><kbd>]</kbd> Prev / Next cell</span>
+      <span><kbd>/</kbd> Search</span>
+      <span><kbd>t</kbd> Theme</span>
+      <span><kbd>Ctrl+B</kbd> Sidebar</span>
+    </div>
+    <div class="status-right">
+      <span id="status-file">Ready</span>
+      <span id="status-scroll">0%</span>
+    </div>
+  </footer>
+
+  <div id="img-modal" class="img-modal" hidden>
+    <img id="img-modal-img" alt="Zoomed output">
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
