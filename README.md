@@ -1,47 +1,106 @@
-# eojupyter
+# eojupyter — Eye of Jupyter
 
-A fast, read-only, light-mode IDE-style Jupyter notebook (`.ipynb`) viewer written in Rust.
+A fast, read-only, IDE-style Jupyter Notebook (`.ipynb`) viewer written in Rust.
 
-- **Left Pane**: VS Code-style file explorer with instant keyboard navigation (`↑` / `↓` / `←` / `→`), `.ipynb` vs `All` filter toggle, and fuzzy/substring search (`/` or `Ctrl+P`).
-- **Right Pane**: GitHub / Jupyter Notebook-style read-only viewer (execution disabled), defaulting to crisp Light mode with an instant Light/Dark toggle (`t`). Supports nbformat v3 & v4, syntax highlighting (`InspiredGitHub` light / `base16-ocean.dark`), GFM Markdown + MathML equations, pandas DataFrame HTML tables, PNG/JPEG/GIF/WebP/SVG outputs, cell attachments, ANSI colors, `\r` progress bar normalization, and XSS sanitization.
-- **Fast**: Native Rust parsing + LRU doc/blob cache + neighbor prefetching + instant `PgUp` / `PgDn` scrolling without changing pane focus.
+Browse directories in a VS Code-style file explorer on the left and read rendered notebooks on the right—like GitHub's notebook view, without spinning up a Jupyter kernel or allowing code execution.
 
-## Build
+## Features
+
+- **Two-Pane IDE Layout**: Resizable file explorer sidebar on the left (with `.ipynb` / `All` mode toggle, workspace root switcher, and quick filter) paired with a clean Jupyter Notebook viewer on the right.
+- **Strict Read-Only Mode**: No kernel execution; Markdown and `text/html` outputs are sanitized with `ammonia`, and SVG outputs are served sandboxed via `<img>`.
+- **Light Mode Default + Dark Mode Toggle**: Opens in crisp Light mode (`InspiredGitHub` syntax theme) with an instant Light/Dark toggle (`t` or toolbar button, using `base16-ocean.dark` in dark mode, persisted in `localStorage`).
+- **Fast Native Rust Engine**:
+  - Supports `nbformat` v3 (`worksheets`) and v4 notebooks.
+  - GFM Markdown (`pulldown-cmark`) with native MathML equations (`latex2mathml`).
+  - Rich cell outputs: pandas `DataFrame` HTML tables, PNG/JPEG/GIF/WebP/SVG images, cell `attachment:` images, LaTeX, JSON, and ANSI color + `\r` progress-bar normalization.
+  - Also previews `.md`, image, and syntax-highlighted text/code files when viewing in `All` mode.
+  - Thread-safe LRU document/blob cache (invalidated by file mtime/size), `AbortController` request cancellation, and neighbor prefetching for instant file switching.
+- **Seamless Keyboard Workflow**: Navigate the file tree with arrow keys (`↑` / `↓` / `←` / `→`) while scrolling the notebook with `PgUp` / `PgDn`—no need to click between panes to switch focus.
+- **Desktop Window or Browser Mode**: Launches a native desktop window (`tao` + `wry` / WebKitGTK), or serves over local HTTP with `--web`.
+
+## Requirements
+
+- Rust toolchain (`rustc` and `cargo`)
+- On Linux for native desktop window mode: `gtk+-3.0` and `webkit2gtk-4.1` development libraries (`pkg-config`)
+
+## Build & Install
 
 ```bash
+# Build release binary
 cargo build --release
+
+# Run tests
+cargo test
+
+# Optional: install onto PATH (~/.cargo/bin)
+cargo install --path .
 ```
 
-The binary is placed at `target/release/eojupyter`.
+The compiled release binary is at `target/release/eojupyter`.
 
 ## Usage
 
 ```bash
-# Open current directory in native desktop window
-./target/release/eojupyter
+# Open current working directory in a native desktop window
+eojupyter
 
 # Open a specific directory or notebook file
-./target/release/eojupyter ./examples
-./target/release/eojupyter ./examples/01_overview.ipynb
+eojupyter ./examples
+eojupyter ./examples/01_overview.ipynb
 
-# Serve over local HTTP and open in your browser instead of a native window
-./target/release/eojupyter ./examples --web
-./target/release/eojupyter ./examples --web --port 8787 --no-open
+# Serve over local HTTP and open in your default browser
+eojupyter ./examples --web
+
+# Serve on a specific port without launching a browser
+eojupyter ./examples --web --port 8787 --no-open
 ```
+
+### CLI Options
+
+| Flag / Argument | Description |
+| --- | --- |
+| `[PATH]` | Directory or `.ipynb` file to open (defaults to current working directory) |
+| `--web` | Serve over local HTTP instead of launching a native desktop window |
+| `--port <PORT>` | Port to bind for the internal HTTP server (`0` = automatic) |
+| `--no-open` | In `--web` mode, print the URL without launching a browser |
+| `-h`, `--help` | Print help |
+| `-V`, `--version` | Print version |
 
 ## Keyboard Shortcuts
 
 | Key | Action |
 | --- | --- |
-| `↑` / `↓` or `j` / `k` | Select previous / next file or folder in explorer (auto-opens files) |
-| `→` / `l` | Expand folder or step into first child |
+| `↑` / `↓` or `j` / `k` | Select previous / next entry in file explorer (auto-renders files) |
+| `→` / `l` | Expand folder or move to its first child |
 | `←` / `h` | Collapse folder or jump to parent folder |
-| `PgDn` / `PgUp` | Scroll notebook down / up (works anytime without clicking right pane) |
-| `Space` / `Shift+Space` | Page down / up in notebook |
+| `Enter` | Toggle folder expand/collapse or reload selected file |
+| `PgDn` / `PgUp` | Scroll notebook down / up (works anytime without changing focus) |
+| `Space` / `Shift+Space` | Scroll notebook page down / up |
 | `Home` / `End` | Jump to top / bottom of notebook |
 | `]` / `[` or `n` / `p` | Jump to next / previous cell |
-| `/` or `Ctrl+P` / `Ctrl+F` | Focus quick file search (`Esc` to clear) |
+| `/` or `Ctrl+P` / `Ctrl+F` | Focus quick file filter (`Esc` to clear and blur) |
 | `t` | Toggle Light / Dark theme |
 | `Ctrl+B` | Toggle file explorer sidebar |
-| `r` or `F5` | Refresh directory tree and force-reload active notebook |
-| `Esc` | Close zoomed image modal or search input |
+| `r` or `F5` | Refresh directory tree and force-reload active file |
+| `Esc` | Close zoomed image modal, clear filter, or cancel root path edit |
+
+## Project Structure
+
+```text
+eojupyter/
+├── Cargo.toml
+├── README.md
+├── src/
+│   ├── main.rs        # CLI flags, native tao+wry window & --web fallback
+│   ├── server.rs      # Multithreaded tiny_http server & JSON/blob API routes
+│   ├── fs_tree.rs     # Traversal-safe directory listing & recursive search
+│   ├── notebook.rs    # nbformat v3/v4 parser, Markdown+MathML, outputs, sanitization
+│   ├── highlight.rs   # Syntect highlighting (InspiredGitHub / base16-ocean.dark)
+│   ├── ansi.rs        # ANSI SGR & carriage-return (\r) terminal output renderer
+│   └── cache.rs       # Thread-safe LRU document & binary blob cache
+├── web/
+│   ├── index.html     # Split-pane IDE shell
+│   ├── style.css      # Light (default) & Dark mode styles
+│   └── app.js         # Tree state, global keyboard navigation, prefetching
+└── examples/          # Sample notebooks for quick testing
+```
