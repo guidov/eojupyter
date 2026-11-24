@@ -99,7 +99,42 @@ pub fn resolve_relative_asset(
     Some(to_rel_posix(root, &canonical))
 }
 
-fn dir_contains_notebook(dir: &Path, depth: usize) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterMode {
+    NotebooksOnly,
+    NotebooksAndPy,
+    All,
+}
+
+impl FilterMode {
+    pub fn from_str_opt(mode: Option<&str>, notebooks_only_fallback: bool) -> Self {
+        match mode.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+            Some("ipynb") => Self::NotebooksOnly,
+            Some("ipynb_py") | Some("py") => Self::NotebooksAndPy,
+            Some("all") => Self::All,
+            _ => {
+                if notebooks_only_fallback {
+                    Self::NotebooksOnly
+                } else {
+                    Self::All
+                }
+            }
+        }
+    }
+
+    pub fn matches_ext(self, ext: &str) -> bool {
+        match self {
+            Self::NotebooksOnly => ext == "ipynb",
+            Self::NotebooksAndPy => ext == "ipynb" || ext == "py",
+            Self::All => true,
+        }
+    }
+}
+
+fn dir_contains_matching(dir: &Path, mode: FilterMode, depth: usize) -> bool {
+    if mode == FilterMode::All {
+        return true;
+    }
     if depth > 4 {
         return true;
     }
@@ -116,23 +151,29 @@ fn dir_contains_notebook(dir: &Path, depth: usize) -> bool {
         if is_ignored_name(&name, is_dir, false) {
             continue;
         }
-        if !is_dir && name.to_ascii_lowercase().ends_with(".ipynb") {
-            return true;
-        }
-        if is_dir {
+        if !is_dir {
+            let ext = Path::new(&name)
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            if mode.matches_ext(&ext) {
+                return true;
+            }
+        } else {
             subdirs.push(entry.path());
         }
     }
     subdirs
         .into_iter()
         .take(32)
-        .any(|sub| dir_contains_notebook(&sub, depth + 1))
+        .any(|sub| dir_contains_matching(&sub, mode, depth + 1))
 }
 
 pub fn list_dir(
     root: &Path,
     rel_path: &str,
-    notebooks_only: bool,
+    mode: FilterMode,
     show_hidden: bool,
 ) -> Result<Vec<TreeEntry>, String> {
     let target = resolve_safe_path(root, rel_path)?;
@@ -164,10 +205,10 @@ pub fn list_dir(
         };
         let is_notebook = !is_dir && ext == "ipynb";
 
-        if notebooks_only && !is_dir && !is_notebook {
+        if !is_dir && !mode.matches_ext(&ext) {
             continue;
         }
-        if notebooks_only && is_dir && !dir_contains_notebook(&path, 0) {
+        if is_dir && mode != FilterMode::All && !dir_contains_matching(&path, mode, 0) {
             continue;
         }
 
@@ -199,7 +240,7 @@ pub fn list_dir(
 pub fn search_files(
     root: &Path,
     query: &str,
-    notebooks_only: bool,
+    mode: FilterMode,
     show_hidden: bool,
     limit: usize,
 ) -> Vec<TreeEntry> {
@@ -245,7 +286,7 @@ pub fn search_files(
             let rel = to_rel_posix(root, &path);
 
             let matches_query = q.is_empty() || rel.to_ascii_lowercase().contains(&q);
-            if matches_query && (!notebooks_only || is_notebook) && !is_dir {
+            if matches_query && mode.matches_ext(&ext) && !is_dir {
                 results.push(TreeEntry {
                     name,
                     path: rel,
@@ -284,20 +325,31 @@ mod tests {
     fn lists_dirs_first_and_filters_notebooks() {
         let root = make_temp_dir("list");
         let sub = root.join("alpha");
+        let py_sub = root.join("beta_py");
         let empty_sub = root.join("empty_dir");
         fs::create_dir_all(&sub).unwrap();
+        fs::create_dir_all(&py_sub).unwrap();
         fs::create_dir_all(&empty_sub).unwrap();
         fs::write(sub.join("inner.ipynb"), "{}").unwrap();
+        fs::write(py_sub.join("util.py"), "x = 1").unwrap();
         fs::write(root.join("notes.md"), "# hi").unwrap();
+        fs::write(root.join("helper.py"), "def f(): pass").unwrap();
         fs::write(root.join("main.ipynb"), "{}").unwrap();
 
-        let nb_only = list_dir(&root, "", true, false).unwrap();
+        let nb_only = list_dir(&root, "", FilterMode::NotebooksOnly, false).unwrap();
         let names: Vec<_> = nb_only.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, vec!["alpha", "main.ipynb"]);
 
-        let all = list_dir(&root, "", false, false).unwrap();
+        let nb_and_py = list_dir(&root, "", FilterMode::NotebooksAndPy, false).unwrap();
+        let py_names: Vec<_> = nb_and_py.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(py_names, vec!["alpha", "beta_py", "helper.py", "main.ipynb"]);
+
+        let all = list_dir(&root, "", FilterMode::All, false).unwrap();
         let all_names: Vec<_> = all.iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(all_names, vec!["alpha", "empty_dir", "main.ipynb", "notes.md"]);
+        assert_eq!(
+            all_names,
+            vec!["alpha", "beta_py", "empty_dir", "helper.py", "main.ipynb", "notes.md"]
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

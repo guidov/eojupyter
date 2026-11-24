@@ -6,7 +6,7 @@ Browse directories in a VS Code-style file explorer on the left and read rendere
 
 ## Features
 
-- **Two-Pane IDE Layout**: Resizable file explorer sidebar on the left (with `.ipynb` / `All` mode toggle, workspace root switcher, and quick filter) paired with a clean Jupyter Notebook viewer on the right.
+- **Two-Pane IDE Layout**: Resizable file explorer sidebar on the left (with `.ipynb` / `+.py` / `All` filter switch, workspace root switcher, and quick filter) paired with a clean Jupyter Notebook viewer on the right.
 - **Strict Read-Only Mode**: No kernel execution; Markdown and `text/html` outputs are sanitized with `ammonia`, and SVG outputs are served sandboxed via `<img>`.
 - **Light Mode Default + Dark Mode Toggle**: Opens in crisp Light mode (`InspiredGitHub` syntax theme) with an instant Light/Dark toggle (`t` or toolbar button, using `base16-ocean.dark` in dark mode, persisted in `localStorage`).
 - **Fast Native Rust Engine**:
@@ -79,6 +79,7 @@ eojupyter ./examples --web --port 8787 --no-open
 | `Home` / `End` | Jump to top / bottom of notebook |
 | `]` / `[` or `n` / `p` | Jump to next / previous cell |
 | `/` or `Ctrl+P` / `Ctrl+F` | Focus quick file filter (`Esc` to clear and blur) |
+| `f` | Cycle explorer filter mode (`.ipynb` → `+.py` → `All`) |
 | `t` | Toggle Light / Dark theme |
 | `Ctrl+B` | Toggle file explorer sidebar |
 | `r` or `F5` | Refresh directory tree and force-reload active file |

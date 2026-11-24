@@ -1,5 +1,5 @@
 use crate::cache::DocCache;
-use crate::fs_tree::{list_dir, resolve_safe_path, search_files};
+use crate::fs_tree::{list_dir, resolve_safe_path, search_files, FilterMode};
 use crate::highlight::syntax_css;
 use crate::notebook::render_file;
 use percent_encoding::percent_decode_str;
@@ -272,9 +272,10 @@ fn handle_request(mut req: Request, state: &Arc<AppState>) {
         (Method::Get, "/api/list") => {
             let rel = query_param(&params, "path").unwrap_or("");
             let notebooks_only = query_bool(&params, "notebooks_only", true);
+            let mode = FilterMode::from_str_opt(query_param(&params, "mode"), notebooks_only);
             let show_hidden = query_bool(&params, "show_hidden", false);
             let root = state.root.read().unwrap().clone();
-            match list_dir(&root, rel, notebooks_only, show_hidden) {
+            match list_dir(&root, rel, mode, show_hidden) {
                 Ok(entries) => respond_text(
                     req,
                     200,
@@ -287,9 +288,10 @@ fn handle_request(mut req: Request, state: &Arc<AppState>) {
         (Method::Get, "/api/search") => {
             let q = query_param(&params, "q").unwrap_or("");
             let notebooks_only = query_bool(&params, "notebooks_only", true);
+            let mode = FilterMode::from_str_opt(query_param(&params, "mode"), notebooks_only);
             let show_hidden = query_bool(&params, "show_hidden", false);
             let root = state.root.read().unwrap().clone();
-            let entries = search_files(&root, q, notebooks_only, show_hidden, 200);
+            let entries = search_files(&root, q, mode, show_hidden, 200);
             respond_text(
                 req,
                 200,
@@ -448,6 +450,7 @@ mod tests {
             ]
         });
         fs::write(dir.join("demo.ipynb"), nb.to_string()).unwrap();
+        fs::write(dir.join("helper.py"), "def greet():\n    return 'hi'\n").unwrap();
 
         let state = Arc::new(AppState::new(dir.clone(), Some("demo.ipynb".into())));
         let addr = start_server(state, 0).unwrap();
@@ -460,9 +463,19 @@ mod tests {
         assert_eq!(s_info, 200);
         assert!(info.contains("demo.ipynb"));
 
-        let (s_list, list) = http_get(addr, "/api/list?path=&notebooks_only=1");
+        let (s_list, list) = http_get(addr, "/api/list?path=&mode=ipynb");
         assert_eq!(s_list, 200);
         assert!(list.contains("demo.ipynb"));
+        assert!(!list.contains("helper.py"));
+
+        let (s_list_py, list_py) = http_get(addr, "/api/list?path=&mode=ipynb_py");
+        assert_eq!(s_list_py, 200);
+        assert!(list_py.contains("demo.ipynb"));
+        assert!(list_py.contains("helper.py"));
+
+        let (s_render_py, rendered_py) = http_get(addr, "/api/render?path=helper.py");
+        assert_eq!(s_render_py, 200);
+        assert!(rendered_py.contains("greet"));
 
         let (s_render, rendered) = http_get(addr, "/api/render?path=demo.ipynb");
         assert_eq!(s_render, 200);

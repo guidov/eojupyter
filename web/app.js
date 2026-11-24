@@ -11,6 +11,7 @@
   const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
   const btnTheme = document.getElementById("btn-theme");
   const btnModeIpynb = document.getElementById("btn-mode-ipynb");
+  const btnModePy = document.getElementById("btn-mode-py");
   const btnModeAll = document.getElementById("btn-mode-all");
   const btnPrevCell = document.getElementById("btn-prev-cell");
   const btnNextCell = document.getElementById("btn-next-cell");
@@ -28,7 +29,7 @@
 
   const state = {
     rootPath: "",
-    notebooksOnly: true,
+    filterMode: "ipynb",      // "ipynb" | "ipynb_py" | "all"
     filterQuery: "",
     dirCache: new Map(),      // dirPath -> TreeEntry[]
     expandedDirs: new Set(),  // dirPath
@@ -71,7 +72,7 @@
     }
     const qs = new URLSearchParams({
       path: dirPath,
-      notebooks_only: state.notebooksOnly ? "1" : "0",
+      mode: state.filterMode,
     });
     const res = await fetch(`/api/list?${qs}`);
     if (!res.ok) return [];
@@ -112,9 +113,11 @@
       empty.className = "tree-empty";
       empty.textContent = state.filterQuery
         ? "No matching files."
-        : state.notebooksOnly
-          ? "No .ipynb notebooks in this folder. Switch to 'All' to view other files."
-          : "Empty directory.";
+        : state.filterMode === "ipynb"
+          ? "No .ipynb notebooks in this folder. Switch to '+.py' or 'All'."
+          : state.filterMode === "ipynb_py"
+            ? "No .ipynb or .py files in this folder. Switch to 'All' to view other files."
+            : "Empty directory.";
       frag.appendChild(empty);
       fileTreeEl.replaceChildren(frag);
       return;
@@ -142,8 +145,9 @@
       row.appendChild(chev);
 
       const icon = document.createElement("span");
+      const isPy = !entry.is_dir && entry.ext === "py";
       icon.className = `tree-icon ${
-        entry.is_dir ? "is-dir" : entry.is_notebook ? "is-nb" : "is-file"
+        entry.is_dir ? "is-dir" : entry.is_notebook ? "is-nb" : isPy ? "is-py" : "is-file"
       }`;
       icon.innerHTML = entry.is_dir ? FOLDER_SVG : entry.is_notebook ? NB_SVG : FILE_SVG;
       row.appendChild(icon);
@@ -216,7 +220,7 @@
       if (
         neighbor &&
         !neighbor.entry.is_dir &&
-        neighbor.entry.is_notebook &&
+        (neighbor.entry.is_notebook || neighbor.entry.ext === "py") &&
         !state.docCache.has(neighbor.entry.path)
       ) {
         candidates.push(neighbor.entry.path);
@@ -358,7 +362,7 @@
     }
     const qs = new URLSearchParams({
       q: state.filterQuery,
-      notebooks_only: state.notebooksOnly ? "1" : "0",
+      mode: state.filterMode,
     });
     const res = await fetch(`/api/search?${qs}`);
     if (!res.ok) return;
@@ -496,26 +500,16 @@
     }
   });
 
-  btnModeIpynb.addEventListener("click", async () => {
-    if (state.notebooksOnly) return;
-    state.notebooksOnly = true;
-    btnModeIpynb.classList.add("active");
-    btnModeAll.classList.remove("active");
-    state.dirCache.clear();
-    await fetchDir("");
-    for (const d of state.expandedDirs) await fetchDir(d);
-    if (state.filterQuery) {
-      await runFilter(state.filterQuery);
-    } else {
-      renderTree();
-    }
-  });
+  function updateModePills() {
+    btnModeIpynb.classList.toggle("active", state.filterMode === "ipynb");
+    btnModePy.classList.toggle("active", state.filterMode === "ipynb_py");
+    btnModeAll.classList.toggle("active", state.filterMode === "all");
+  }
 
-  btnModeAll.addEventListener("click", async () => {
-    if (!state.notebooksOnly) return;
-    state.notebooksOnly = false;
-    btnModeAll.classList.add("active");
-    btnModeIpynb.classList.remove("active");
+  async function setFilterMode(mode) {
+    if (state.filterMode === mode) return;
+    state.filterMode = mode;
+    updateModePills();
     state.dirCache.clear();
     await fetchDir("");
     for (const d of state.expandedDirs) await fetchDir(d);
@@ -524,7 +518,11 @@
     } else {
       renderTree();
     }
-  });
+  }
+
+  btnModeIpynb.addEventListener("click", () => setFilterMode("ipynb"));
+  btnModePy.addEventListener("click", () => setFilterMode("ipynb_py"));
+  btnModeAll.addEventListener("click", () => setFilterMode("all"));
 
   rootForm.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -686,6 +684,17 @@
       return;
     }
 
+    if (e.key === "f" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const nextMode = state.filterMode === "ipynb"
+        ? "ipynb_py"
+        : state.filterMode === "ipynb_py"
+          ? "all"
+          : "ipynb";
+      await setFilterMode(nextMode);
+      return;
+    }
+
     // File tree navigation
     const nodes = state.visibleNodes;
     if (nodes.length === 0) return;
@@ -752,6 +761,15 @@
       const info = await res.json();
       state.rootPath = info.root;
       rootInput.value = info.root;
+      if (info.initial_file) {
+        const lower = info.initial_file.toLowerCase();
+        if (lower.endsWith(".py")) {
+          state.filterMode = "ipynb_py";
+        } else if (!lower.endsWith(".ipynb")) {
+          state.filterMode = "all";
+        }
+        updateModePills();
+      }
       await loadWorkspace(info.initial_file || null);
     } catch (err) {
       notebookRoot.innerHTML = `<div class="nb-empty">Failed to initialize viewer: ${err.message}</div>`;

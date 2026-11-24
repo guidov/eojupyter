@@ -311,6 +311,14 @@ body {
   color: var(--nb-orange);
 }
 
+.tree-icon.is-py {
+  color: #3572a5;
+}
+
+html[data-theme="dark"] .tree-icon.is-py {
+  color: #58a6ff;
+}
+
 .tree-icon.is-dir {
   color: #54aeff;
 }
