@@ -1,4 +1,4 @@
-# eojupyter — Eye of Jupyter
+# <img src="icons/eojupyter.svg" width="36" height="36" align="center" alt="eojupyter icon"> eojupyter — Eye of Jupyter
 
 A fast, read-only, IDE-style Jupyter Notebook (`.ipynb`) viewer written in Rust.
 
@@ -34,6 +34,9 @@ cargo test
 
 # Optional: install onto PATH (~/.cargo/bin)
 cargo install --path .
+
+# Optional (Linux): install desktop launcher & application icons (Wayland/X11 dock)
+./scripts/install-desktop.sh
 ```
 
 The compiled release binary is at `target/release/eojupyter`.

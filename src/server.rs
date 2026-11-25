@@ -15,6 +15,8 @@ use tiny_http::{Header, Method, Request, Response, StatusCode};
 const INDEX_HTML: &str = include_str!("../web/index.html");
 const STYLE_CSS: &str = include_str!("../web/style.css");
 const APP_JS: &str = include_str!("../web/app.js");
+const ICON_SVG: &str = include_str!("../icons/eojupyter.svg");
+const ICON_PNG: &[u8] = include_bytes!("../icons/eojupyter-128.png");
 
 pub struct AppState {
     pub root: RwLock<PathBuf>,
@@ -203,6 +205,18 @@ fn handle_request(mut req: Request, state: &Arc<AppState>) {
         }
         (Method::Get, "/app.js") => {
             respond_text(req, 200, "application/javascript; charset=utf-8", APP_JS);
+        }
+        (Method::Get, "/icon.svg") => {
+            respond_text(req, 200, "image/svg+xml; charset=utf-8", ICON_SVG);
+        }
+        (Method::Get, "/icon.png") | (Method::Get, "/favicon.ico") => {
+            respond_bytes(
+                req,
+                200,
+                "image/png",
+                ICON_PNG.to_vec(),
+                Some("public, max-age=86400"),
+            );
         }
         (Method::Get, "/api/info") => {
             let root = state.root.read().unwrap().clone();
@@ -458,6 +472,13 @@ mod tests {
         let (s_home, home) = http_get(addr, "/");
         assert_eq!(s_home, 200);
         assert!(home.contains("eojupyter"));
+
+        let (s_icon, icon_svg) = http_get(addr, "/icon.svg");
+        assert_eq!(s_icon, 200);
+        assert!(icon_svg.contains("<svg"));
+
+        let (s_icon_png, _) = http_get(addr, "/icon.png");
+        assert_eq!(s_icon_png, 200);
 
         let (s_info, info) = http_get(addr, "/api/info");
         assert_eq!(s_info, 200);

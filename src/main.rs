@@ -9,10 +9,13 @@ use clap::Parser;
 use server::{start_server, AppState};
 use std::env;
 use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::thread;
+
+const APP_ICON_PNG: &[u8] = include_bytes!("../icons/eojupyter-128.png");
 
 #[derive(Parser, Debug)]
 #[command(
@@ -79,15 +82,59 @@ fn run_web_mode(url: &str, no_open: bool) {
     }
 }
 
+fn load_window_icon() -> Option<tao::window::Icon> {
+    let mut decoder = png::Decoder::new(Cursor::new(APP_ICON_PNG));
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()?];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let bytes = &buf[..info.buffer_size()];
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => bytes.to_vec(),
+        png::ColorType::Rgb => {
+            let mut out = Vec::with_capacity((info.width * info.height * 4) as usize);
+            for chunk in bytes.chunks_exact(3) {
+                out.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
+            }
+            out
+        }
+        _ => return None,
+    };
+    tao::window::Icon::from_rgba(rgba, info.width, info.height).ok()
+}
+
 fn run_native_window(url: &str, title: &str) -> Result<(), String> {
     use tao::dpi::LogicalSize;
     use tao::event::{Event, WindowEvent};
-    use tao::event_loop::{ControlFlow, EventLoop};
+    use tao::event_loop::{ControlFlow, EventLoopBuilder};
     use tao::window::WindowBuilder;
 
-    let event_loop = EventLoop::new();
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    let event_loop = {
+        use tao::platform::unix::EventLoopBuilderExtUnix;
+        EventLoopBuilder::new()
+            .with_app_id("io.github.guidov.eojupyter")
+            .build()
+    };
+
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )))]
+    let event_loop = EventLoopBuilder::new().build();
+
     let window = WindowBuilder::new()
         .with_title(title)
+        .with_window_icon(load_window_icon())
         .with_inner_size(LogicalSize::new(1400.0, 900.0))
         .with_min_inner_size(LogicalSize::new(720.0, 480.0))
         .build(&event_loop)
@@ -177,5 +224,15 @@ fn main() {
             eprintln!("Native window unavailable ({e}); falling back to web mode.");
             run_web_mode(&url, cli.no_open);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_window_icon_decodes_cleanly() {
+        assert!(load_window_icon().is_some());
     }
 }

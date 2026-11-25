@@ -85,6 +85,15 @@ body {
   flex: 1 1 auto;
 }
 
+.brand-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 4px;
+  user-select: none;
+}
+
 .brand {
   font-weight: 700;
   font-size: 13px;

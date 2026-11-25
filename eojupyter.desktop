@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=eojupyter
+GenericName=Jupyter Notebook Viewer
+Comment=Eye of Jupyter — fast, read-only IDE-style Jupyter Notebook viewer
+Exec=eojupyter %F
+Icon=eojupyter
+Terminal=false
+Categories=Development;Science;Utility;
+MimeType=application/x-ipynb+json;
+StartupWMClass=io.github.guidov.eojupyter
