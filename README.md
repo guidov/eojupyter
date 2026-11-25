@@ -37,6 +37,10 @@ cargo install --path .
 
 # Optional (Linux): install desktop launcher & application icons (Wayland/X11 dock)
 ./scripts/install-desktop.sh
+
+# Optional (Debian/Ubuntu): build a .deb package and install it system-wide
+./scripts/build-deb.sh
+sudo apt install ./dist/eojupyter_0.1.0_amd64.deb
 ```
 
 The compiled release binary is at `target/release/eojupyter`.
